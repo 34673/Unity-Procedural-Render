@@ -1,0 +1,17 @@
+#include "Packages/com.unity.render-pipelines.core/Runtime/UnifiedRayTracing/TraceRayAndQueryHit.hlsl"
+struct Ray{
+    float3 origin;
+    float distance;
+};
+RWStructuredBuffer<Ray> rays;
+UNIFIED_RT_DECLARE_ACCEL_STRUCT(_AccelStruct);
+void RayGenExecute(UnifiedRT::DispatchInfo dispatchInfo){
+    UnifiedRT::RayTracingAccelStruct accelerationStructure = UNIFIED_RT_GET_ACCEL_STRUCT(_AccelStruct);
+    int threadIndex = dispatchInfo.dispatchThreadID[0];
+    UnifiedRT::Ray ray;
+    ray.origin = rays[threadIndex].origin;
+    ray.direction = float3(0,-1,0);
+    ray.tMin = 0;
+    ray.tMax = rays[threadIndex].distance;
+    rays[threadIndex].distance = UnifiedRT::TraceRayClosestHit(dispatchInfo,accelerationStructure,0xFFFFFFFF,ray,0).hitDistance;
+}

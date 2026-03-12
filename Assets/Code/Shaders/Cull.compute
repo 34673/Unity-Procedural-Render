@@ -1,0 +1,47 @@
+#pragma use_dxc
+struct Plane{
+	float3 normal;
+	float distance;
+};
+//======================================
+// Cull
+//======================================
+#pragma kernel Cull
+StructuredBuffer<Plane> frustumPlanes;
+StructuredBuffer<float3x4> transforms;
+StructuredBuffer<float> objectRadii;
+RWStructuredBuffer<uint> visibleOffsets;
+RWStructuredBuffer<uint> indirectBuffer;
+RWStructuredBuffer<uint> visibleOffsetCounters;
+float3 cameraPosition;
+int drawDistance;
+int drawID;
+int totalThreads;
+[numthreads(64,1,1)]
+void Cull(uint3 id : SV_DispatchThreadID){
+    if(id.x >= totalThreads){return;}
+    uint instanceCountIndex = drawID * 5 + 1;
+    uint startInstanceIndex = drawID * 5 + 4;
+    uint offset = indirectBuffer[startInstanceIndex] + id.x;
+    float3 objectPosition = float3(transforms[offset][0].w,transforms[offset][1].w,transforms[offset][2].w);
+    float distanceToCamera = distance(cameraPosition,objectPosition);
+    bool visible = distanceToCamera <= drawDistance;
+	if(!visible){
+        InterlockedAdd(indirectBuffer[instanceCountIndex],-1);
+		return;
+    }
+	uint planeCount, _;
+	frustumPlanes.GetDimensions(planeCount, _);
+	for(int index = 0;index < planeCount;index += 1){
+        Plane plane = frustumPlanes[index];
+        float signedDistance = dot(plane.normal,objectPosition) + plane.distance;
+        visible = signedDistance >= -objectRadii[drawID];
+		if(visible){continue;}
+        InterlockedAdd(indirectBuffer[instanceCountIndex],-1);
+        return;
+    }
+    uint counter;
+    InterlockedAdd(visibleOffsetCounters[drawID],1,counter);
+    uint visibleIndex = indirectBuffer[startInstanceIndex] + counter;
+    visibleOffsets[visibleIndex] = offset;
+}

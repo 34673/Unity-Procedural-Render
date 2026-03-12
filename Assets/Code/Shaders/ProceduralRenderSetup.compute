@@ -1,0 +1,102 @@
+//Small RNG algorithm, courtesy of Naze
+static float random[] = {
+	126, 134, 88, 139, 155, 174, 86, 49, 255, 78, 44, 153, 29, 149, 4, 232, 106, 97, 143, 46, 42, 113, 211, 220, 104, 183, 18, 79, 72, 110, 1, 250,
+	199, 77, 163, 147, 14, 223, 144, 191, 76, 47, 25, 8, 11, 35, 87, 89, 93, 238, 177, 60, 53, 171, 194, 34, 154, 112, 213, 109, 161, 142, 94, 12, 52,
+	233, 9, 38, 95, 156, 237, 119, 130, 195, 3, 226, 140, 2, 105, 85, 227, 219, 32, 158, 63, 116, 68, 48, 246, 196, 189, 152, 200, 241, 214, 173, 252,
+	215, 98, 127, 108, 31, 92, 123, 69, 167, 33, 57, 132, 55, 36, 248, 224, 193, 83, 118, 207, 58, 216, 236, 230, 124, 185, 137, 178, 253, 249, 121,
+	244, 166, 146, 74, 65, 114, 150, 231, 172, 133, 179, 27, 67, 201, 17, 129, 39, 198, 180, 21, 99, 204, 5, 182, 254, 107, 6, 24, 245, 138, 66, 209,
+	70, 208, 235, 205, 190, 28, 251, 102, 145, 117, 202, 10, 159, 229, 222, 135, 26, 81, 80, 217, 218, 170, 0, 22, 247, 151, 50, 19, 90, 115, 120, 157,
+	54, 206, 15, 234, 30, 239, 210, 75, 197, 128, 45, 61, 71, 131, 181, 51, 100, 242, 192, 103, 176, 184, 37, 188, 225, 136, 160, 73, 203, 187, 141, 164,
+	168, 84, 122, 243, 186, 64, 221, 212, 41, 165, 40, 13, 228, 20, 175, 82, 91, 169, 16, 56, 162, 43, 101, 240, 148, 96, 62, 23, 59, 125, 7
+};
+float WhiteNoise(float value){
+	float floorX = floor(fmod(value,255));
+	float mod = random[floorX] + value;
+	mod = random[floor(fmod(mod,255))] + value;
+	mod = random[floor(fmod(mod,255))];
+	return mod / 255;
+}
+//From Unity.Mathematics
+float3x3 AxisAngle(float3 axis, float angle){
+	float sina = sin(angle);
+	float cosa = cos(angle);
+	float3 u = axis;
+	float3 u_yzx = u.yzx;
+	float3 u_zxy = u.zxy;
+	float3 u_inv_cosa = u - u * cosa;  // u * (1.0f - cosa);
+	float4 t = float4(u * sina, cosa);
+	uint3 ppn = uint3(0x00000000, 0x00000000, 0x80000000);
+	uint3 npp = uint3(0x80000000, 0x00000000, 0x00000000);
+	uint3 pnp = uint3(0x00000000, 0x80000000, 0x00000000);
+	return float3x3(
+		cosa + u.x * u.x * (1.0f - cosa), u.y * u.x * (1.0f - cosa) - u.z * sina, u.z * u.x * (1.0f - cosa) + u.y * sina,
+		u.x * u.y * (1.0f - cosa) + u.z * sina, cosa + u.y * u.y * (1.0f - cosa), u.y * u.z * (1.0f - cosa) - u.x * sina,
+		u.x * u.z * (1.0f - cosa) - u.y * sina, u.y * u.z * (1.0f - cosa) + u.x * sina, cosa + u.z * u.z * (1.0f - cosa)
+	);
+}
+float3 unlerp(float3 start,float3 end,float3 x){return (x - start) / (end - start);}
+float3 remap(float3 srcStart,float3 srcEnd,float3 dstStart,float3 dstEnd,float3 x){return lerp(dstStart,dstEnd,unlerp(srcStart,srcEnd,x));}
+//-----------------------------------------
+#pragma use_dxc
+struct Ray{
+	float3 origin;
+	float distance;
+};
+RWStructuredBuffer<Ray> rays;
+RWStructuredBuffer<float3x4> transforms;
+//=======================================
+// Setup Raycasts
+//=======================================
+#pragma kernel SetupRaycasts
+StructuredBuffer<int> indexOffsets;
+StructuredBuffer<int> instancesPerTexel;
+StructuredBuffer<float3> origins;
+cbuffer SetupRaycastCBuffer{
+	float3 terrainBoundsMin;
+	float3 terrainBoundsMax;
+	float terrainHeight;
+	float3 textureSize;
+	float aspectRatio;
+	float3 worldCellSize;
+};
+[numthreads(64,1,1)]
+void SetupRaycasts(uint3 id : SV_DispatchThreadID){
+	int index = id.x;
+	uint indexOffset = indexOffsets[index];
+	uint instances = instancesPerTexel[index];
+	uint columns = (int)round(sqrt(instances / aspectRatio));
+	uint rows = instances / columns;
+	float3 spacing = worldCellSize / float3(columns,1.0f,rows);
+	float3 randomOffset = spacing * float3(WhiteNoise(index) * 0.5f + 0.75f,0.0f,WhiteNoise(index + 1) * 0.5f + 0.75f) - spacing;
+	float3 worldSpace = remap(float3(0,0,0),textureSize,terrainBoundsMin,terrainBoundsMax,origins[index]);
+	randomOffset.y = 0.0f;
+	rays[indexOffset].origin = worldSpace + randomOffset;
+	rays[indexOffset].distance = terrainHeight;
+	indexOffset += 1;
+	for(uint instance = 1; instance < instances; instance += 1){
+		randomOffset = spacing * float3(WhiteNoise(index + instance) * 0.5f + 0.75f,0.0f,WhiteNoise(index * instance) * 0.5f + 0.75f);
+		float3 gridOffset = float3(instance % columns,0.0f,instance / rows);
+		rays[indexOffset].origin = worldSpace + gridOffset * randomOffset;
+		rays[indexOffset].distance = terrainHeight;
+		indexOffset += 1;
+	}
+}
+//=======================================
+// Fill Transforms
+//=======================================
+#pragma kernel FillTransforms
+[numthreads(64,1,1)]
+void FillTransforms(uint3 id : SV_DispatchThreadID){
+	uint index = id.x;
+	float3 down = float3(0, -1, 0);
+	float3 position = rays[id.x].origin + down * rays[id.x].distance;
+    float random = WhiteNoise(index);
+	float randomRotation = radians(random * 360);
+	float3x3 rotation = AxisAngle(float3(0,1,0),randomRotation);
+	float scale = random * 0.5f + 0.75f;
+	transforms[index] = float3x4(
+		float4(rotation[0][0],rotation[1][0],rotation[2][0],position.x),
+		float4(rotation[0][1] * scale,rotation[1][1] * scale,rotation[2][1] * scale,position.y),
+		float4(rotation[0][2],rotation[1][2],rotation[2][2],position.z)
+	);
+}
