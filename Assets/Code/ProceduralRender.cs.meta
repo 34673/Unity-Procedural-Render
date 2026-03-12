@@ -1,18 +1,2 @@
 fileFormatVersion: 2
 guid: 30b206ba971c87d4fac5d023cec52611
-MonoImporter:
-  externalObjects: {}
-  serializedVersion: 2
-  defaultReferences:
-  - terrain: {instanceID: 0}
-  - generationTexture: {instanceID: 0}
-  - raycastShader: {fileID: -6772857160820960102, guid: 5eae6dfa8883c0e42b01dc26328bab42, type: 3}
-  - raytraceShader: {fileID: -5126288278712620388, guid: 5eae6dfa8883c0e42b01dc26328bab42, type: 3}
-  - setupShader: {fileID: 7200000, guid: b82684bb7ccf2164b82855be4ca9b25a, type: 3}
-  - cullShader: {fileID: 7200000, guid: d978c1a7cc33a414a823b25142f88aa3, type: 3}
-  - combined: {instanceID: 0}
-  executionOrder: 0
-  icon: {instanceID: 0}
-  userData: 
-  assetBundleName: 
-  assetBundleVariant: 

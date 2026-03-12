@@ -131,3 +131,6 @@ Other channels are currently ignored.
 - Added shader keyword and property for optional NdotL use on the main light.
 - Changed transform buffer to use 3x4 matrices rather than 4x4 (-25% memory usage and possibly faster processing).
 - Minor refactors/cleanups.
+
+## Revision 17:
+- Tucked code into its own namespace to avoid immediate collisions with external systems.
