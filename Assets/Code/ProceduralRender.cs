@@ -310,4 +310,10 @@ namespace ProceduralRender{
 		[FieldOffset(44)] public float aspectRatio;
 		[FieldOffset(48)] public Vector3 worldCellSize;
 	}
+	#if UNITY_EDITOR
+	public class RayTracingStripping: IRenderPipelineGraphicsSettingsStripper<RayTracingRenderPipelineResources>{
+		public bool active => true;
+		public bool CanRemoveSettings(RayTracingRenderPipelineResources settings) => false;
+	}
+	#endif
 }
