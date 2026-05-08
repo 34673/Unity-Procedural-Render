@@ -14,7 +14,7 @@ The `generation texture` is a top-down view of the chosen `terrain` mesh (simila
 Other channels are currently ignored.
 
 # Setup Requirements
-- Unity 6.3 (for UnifiedRayTracing API)
+- Unity 6000.3.15f1+ (for UnifiedRayTracing API)
 - All the referenced assets should be imported with the `Read/Write` option enabled.
 - The texture itself should be imported with:
     - Format: `RG 16`
@@ -134,3 +134,7 @@ Other channels are currently ignored.
 
 ## Revision 17:
 - Tucked code into its own namespace to avoid immediate collisions with external systems.
+
+## Revision 18:
+- Updated to Unity 6000.3.15f1 to allow raytracing compute path to work in builds.
+- Removed a few unrelated packages in the sample project.
